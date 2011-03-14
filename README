@@ -29,6 +29,7 @@ The way it works right now is:
     back! Way to be! Commit the betterments.
  5. Find .pkg.gz file in the pkg/ subdirectory. Upload it to your repo or
     whatever you use to distribute packages to your solaris boxen.
- 6. Profit!
+ 6. ???
+ 7. Profit!
 
 .: marut
