@@ -1,0 +1,3 @@
+CATamanda requires that the ld used be gnu ld and the packaging
+phase only succeeds when run as root (due to the insistence of
+the installation system of setting suid and chowning).
