@@ -18,7 +18,7 @@
 #  along with CATsfw.  If not, see <http://www.gnu.org/licenses/>.
 
 PKGNAME='CATiconv'
-PKGVERS='1.13.1'
+PKGVERS='1.14'
 
 PREFIX=/opt/sfw
 STARTDIR="`pwd`"
@@ -135,7 +135,8 @@ package ()
 
 	echo "Installing (fake) to ${STAGINGDIR}..."
 	/opt/csw/bin/gmake DESTDIR="${STAGINGDIR}" install || exit 1
-	mv ${STAGINGDIR}/${PREFIX}/* ${STAGINGDIR} && rmdir ${STAGINGDIR}/${PREFIX}
+	PRFX=`echo $PREFIX | cut -d / -f 2`
+	mv ${STAGINGDIR}/${PREFIX}/* ${STAGINGDIR} && rm -rf ${STAGINGDIR}/${PRFX}
 
 	echo "Calculating prototype..."
 	if [ ! -d ${PKGDIR} ]; then
@@ -166,7 +167,7 @@ package ()
 	touch ${PKGDIR}/copyright
 	echo "i pkginfo" >"${PKGDIR}/prototype"
 	echo "i copyright" >>"${PKGDIR}/prototype"
-	pkgproto "${STAGINGDIR}=${PREFIX}" >> "${PKGDIR}/prototype"
+	pkgproto "${STAGINGDIR}=" >> "${PKGDIR}/prototype"
 	/opt/csw/bin/gsed -i "s/$USER $GROUP/root bin/" "${PKGDIR}/prototype"
 
 	PKGNAME="${PKGDIR}/${PKGNAME}-${PKGVERS}-`uname -s``uname -r`-`uname -p`-CAT.pkg"

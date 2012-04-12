@@ -18,7 +18,7 @@
 #  along with CATsfw.  If not, see <http://www.gnu.org/licenses/>.
 
 PKGNAME='CATsamba'
-PKGVERS='3.5.7'
+PKGVERS='3.6.4'
 
 PREFIX=/opt/sfw
 STARTDIR="`pwd`"
@@ -27,17 +27,21 @@ PKGDIR="${STARTDIR}/pkg"
 SRCDIR="${STARTDIR}/samba-${PKGVERS}/source3"
 STAGINGDIR="${PKGDIR}/staging"
 PKGBLDDIR="${PKGDIR}/build"
+PYTHON=/opt/csw/bin/python
+PYTHON_CONFIG=/opt/csw/bin/python-config
 
 OPENLDAPVERS='2.2.26'
 
 AR=/opt/csw/bin/gar
-CC=/opt/csw/gcc4/bin/gcc
-LD=/opt/csw/gcc4/bin/ld
+CC=/opt/SUNWspro/bin/cc
+LD=/usr/ccs/bin/ld
 PATH='/bin:/sbin:/opt/sfw/bin:/opt/csw/bin:/opt/csw/gcc4/bin'
-LDFLAGS="-L/opt/sfw/lib -L/opt/csw/lib -L/usr/lib -L/lib -L/opt/csw/gcc4/lib -R/opt/sfw/lib -R/opt/csw/lib -R/usr/lib -R/lib -R/opt/csw/gcc4/lib -lsasl2 -lintl -lgss"
-CFLAGS="-I/opt/sfw/include -I/opt/csw/include -I/usr/include"
+LDFLAGS="-L/opt/csw/lib -L/opt/csw/gcc4/lib -R/opt/csw/lib -R/opt/csw/gcc4/lib -lsasl2 -lintl -lgss"
+CFLAGS="-I/opt/csw/include"
 CPPFLAGS="$CFLAGS"
 CXXFLAGS="$CFLAGS"
+LIBS="-lintl -liconv"
+LD_LIBRARY_PATH=/opt/csw/lib
 
 export AR
 export CC
@@ -45,8 +49,11 @@ export CFLAGS
 export CPPFLAGS
 export CXXFLAGS
 export LD
-export LDFLAGS
-export PATH
+export export PATH
+export PYTHON
+export PYTHON_CONFIG
+export LIBS
+export LD_LIBRARY_PATH
 
 #=== FUNCTION ================================================================
 #        NAME:  configure
@@ -70,12 +77,15 @@ configure ()
 		--with-acl-support \
 		--with-quotas \
 		--with-ldap=/opt/csw \
-		--with-krb5=/opt/sfw \
+		--with-krb5=/opt/csw \
+		--with-libiconv=/opt/csw \
 		--with-syslog \
 		--with-utmp \
 		--with-shared-modules=vfs_zfsacl,idmap_ldap,idmap_rid,idmap_ad,idmap_adex,idmap_hash,idmap_tdb2 \
 		--enable-shared-libs=yes \
 		--enable-shared=yes \
+		--enable-socket-wrapper=yes \
+		--enable-static=no \
 		--disable-swat \
 		--disable-external-libtalloc \
 		--disable-external-libtdb
@@ -90,8 +100,8 @@ configure ()
 file_depend ()
 {
 	cat <<-EOF
-		P CATlintl
-		P CATkrb5
+		P CSWlibintl8
+		P CSWkrb5lib
 		P CSWoldap
 		P CSWsasl
 	EOF
@@ -105,6 +115,7 @@ main ()
 {
 	setup
 	configure
+	hacktomakeitwork
 	compile
 	package	
 }
@@ -143,6 +154,43 @@ setup ()
 	if [ ! -d ${PKGBLDDIR} ]; then
 	 mkdir ${PKGBLDDIR}
 	fi
+
+	# Haven't figured out how to work around this, so...
+	PAUSE=0
+	if /bin/test ! -e /opt/csw/lib/libintl.so ]; then
+		echo
+		echo "To make this work, you probably need to run:"
+		echo "ln -s /opt/csw/lib/libintl.so.8 /opt/csw/lib/libintl.so"
+		echo
+		PAUSE=1
+	fi
+
+	if /bin/test ! -e /opt/csw/lib/libiconv.so ]; then
+		echo
+		echo "To make this work, you probably need to run:"
+		echo "ln -s /opt/csw/lib/libiconv.so.8 /opt/csw/lib/libiconv.so"
+		echo
+		PAUSE=1
+	fi
+
+	if [ "$PAUSE" -eq 1 ]; then
+		echo "Press Enter to continue or Ctrl-C to cancel..."
+		read PAUSED
+	fi
+}
+
+#=== FUNCTION ================================================================
+#        NAME:  hacktomakeitwork
+# DESCRIPTION:  http://web.archiveorange.com/archive/v/WEFLnF9YRDi0ckIbnaaG
+#               Basically, samba on solaris is broken. all hail samba.
+#=============================================================================
+hacktomakeitwork ()
+{
+	cd ${SRCDIR} || exit 1
+	sed -e 's/LIBNETAPI_LIBS=bin\/libnetapi.a/LIBNETAPI_LIBS=bin\/libnetapi.a -lintl/' \
+	    -e 's/PAM_WINBIND_OBJ) -lpam/PAM_WINBIND_OBJ) -lpam -lintl/' \
+	    Makefile > Makefile.1
+	mv Makefile.1 Makefile
 }
 
 #=== FUNCTION ================================================================
@@ -223,6 +271,9 @@ file_checkinstall ()
 file_postinstall ()
 {
 	cat <<-EOF
+		mkdir -p /var/samba/locks
+		touch /var/samba/locks/nmbd.pid
+		touch /var/samba/locks/smbd.pid
 		/usr/sbin/svccfg import ${PREFIX}/var/svc/manifest/network/samba.xml
 		/usr/sbin/svccfg import ${PREFIX}/var/svc/manifest/network/wins.xml
 		/usr/sbin/svcadm disable -s svc:network/samba:cat
@@ -283,8 +334,7 @@ file_prototype ()
 	echo "i depend"
 	(
 		cd ${STAGINGDIR};
-		pkgproto "${STAGINGDIR}/${PREFIX}=${PREFIX}" > $TEMP
-		pkgproto "${STAGINGDIR}/var/samba=/var/samba" >> $TEMP
+		pkgproto "${STAGINGDIR}/${PREFIX}=" > $TEMP
                 sed  "s/${USER} ${GROUP}/root bin/" $TEMP
 	)
 	rm $TEMP
@@ -320,7 +370,7 @@ file_smbd_manifest ()
 		    <exec_method type='method' name='start' exec='${PREFIX}/sbin/smbd -D' timeout_seconds='170'>
 		      <method_context>
 		        <method_environment>
-		          <envvar name="LD_LIBRARY_PATH" value="${PREFIX}/lib:/lib:/usr/lib:/opt/csw/lib:/opt/csw/gcc4/lib" />
+		          <envvar name="LD_LIBRARY_PATH" value="${PREFIX}/lib:/opt/csw/lib:/opt/csw/gcc4/lib:/lib:/usr/lib" />
 		        </method_environment>
 		      </method_context>
 		    </exec_method>
@@ -375,7 +425,7 @@ file_nmbd_manifest ()
 		    <exec_method type='method' name='start' exec='${PREFIX}/sbin/nmbd -D' timeout_seconds='170'>
 		      <method_context>
 		        <method_environment>
-		          <envvar name="LD_LIBRARY_PATH" value="${PREFIX}/lib:/lib:/usr/lib:/opt/csw/lib:/opt/csw/gcc4/lib" />
+		          <envvar name="LD_LIBRARY_PATH" value="${PREFIX}/lib:/opt/csw/lib:/opt/csw/gcc4/lib:/lib:/usr/lib" />
 		        </method_environment>
 		      </method_context>
 		    </exec_method>

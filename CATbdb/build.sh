@@ -18,7 +18,7 @@
 #  along with CATsfw.  If not, see <http://www.gnu.org/licenses/>.
 
 PKGNAME='CATbdb'
-PKGVERS='5.1.25'
+PKGVERS='5.3.15'
 
 PREFIX=/opt/sfw
 STARTDIR="`pwd`"
@@ -113,8 +113,8 @@ EOF
 touch ${PKGDIR}/copyright
 echo "i pkginfo" >"${PKGDIR}/prototype"
 echo "i copyright" >>"${PKGDIR}/prototype"
-pkgproto "${STAGINGDIR}=${PREFIX}" >> "${PKGDIR}/prototype"
-/opt/csw/bin/gsed -i "s/$USER $GROUP/root bin/" "${PKGDIR}/prototype"
+pkgproto "${STAGINGDIR}=" >> "${PKGDIR}/prototype"
+/opt/csw/bin/gsed -i "s/$USER $GROUP/ root bin/" "${PKGDIR}/prototype"
 
 PKGNAME="${PKGDIR}/${PKGNAME}-${PKGVERS}-`uname -s``uname -r`-`uname -p`-CAT.pkg"
 
